@@ -1,0 +1,18 @@
+# Local operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Runtime and editor artifacts
+*.log
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+
+# Legacy source folders retained locally only because OneDrive has them locked.
+forestal pharm/
+Lomagundi_Beta/
+website/
+
