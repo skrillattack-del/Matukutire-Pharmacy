@@ -12,8 +12,11 @@ RUN apt-get update \
     && apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
-# mod_headers powers the security headers below.
-RUN a2enmod headers
+# mod_php requires prefork. Select it explicitly so package updates cannot
+# leave Apache with multiple MPMs enabled; mod_headers powers the headers below.
+RUN a2dismod -f mpm_event mpm_worker \
+    && a2enmod mpm_prefork headers \
+    && apache2ctl configtest
 
 # Sane, production-leaning PHP defaults for a small brochure/contact-form site.
 RUN { \
