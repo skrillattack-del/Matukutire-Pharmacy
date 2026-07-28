@@ -2422,6 +2422,20 @@ hr.divider {
   font: 700 var(--fs-xs)/1 var(--font-body);
   cursor: pointer;
 }
+.chat-model-select {
+  flex: none;
+  max-width: 70%;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: 500 var(--fs-xs) / 1.2 var(--font-body);
+  cursor: pointer;
+}
+.chat-model-select[hidden] {
+  display: none;
+}
 .chat-messages {
   flex: 1;
   min-height: 0;

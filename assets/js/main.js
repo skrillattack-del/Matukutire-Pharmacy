@@ -481,13 +481,17 @@
     var body = dock.querySelector(".chat-dock-body");
     var note = dock.querySelector(".chat-dock-note");
     var API_URL = "chat-handler.php";
+    var MODEL_KEY = "pharmacyChatModel";
     var messages = [];
+    var modelsLoaded = false;
 
     if (!body) return;
     body.innerHTML =
       '<section class="chat-conversation" data-chat-conversation>' +
         '<div class="chat-toolbar">' +
           '<span data-chat-model-label>Pharmacy assistant</span>' +
+          '<label class="sr-only" for="chat-model">Assistant model</label>' +
+          '<select class="chat-model-select" id="chat-model" data-chat-model hidden></select>' +
         '</div>' +
         '<div class="chat-messages" data-chat-messages aria-live="polite"></div>' +
         '<form class="chat-composer" data-chat-form>' +
@@ -506,6 +510,74 @@
     var form = body.querySelector("[data-chat-form]");
     var input = body.querySelector("[data-chat-input]");
     var sendBtn = body.querySelector("[data-chat-send]");
+    var modelSelect = body.querySelector("[data-chat-model]");
+    var modelLabel = body.querySelector("[data-chat-model-label]");
+
+    function storedModel() {
+      try {
+        return window.localStorage.getItem(MODEL_KEY) || "";
+      } catch (err) {
+        return "";
+      }
+    }
+
+    function rememberModel(value) {
+      try {
+        window.localStorage.setItem(MODEL_KEY, value);
+      } catch (err) {
+        /* Private browsing — the choice just won't persist. */
+      }
+    }
+
+    /* The picker is filled from the server's list of currently-free models rather
+       than a hard-coded set, because OpenRouter retires free models regularly. */
+    function loadModels() {
+      if (modelsLoaded || !modelSelect) return;
+      modelsLoaded = true;
+
+      fetch(API_URL + "?models=1")
+        .then(function (response) { return response.json(); })
+        .then(function (payload) {
+          if (payload.pinned) return;
+          var list = Array.isArray(payload.models) ? payload.models : [];
+          if (list.length < 2) return;
+
+          var saved = storedModel();
+          var hasSaved = false;
+
+          list.forEach(function (item) {
+            if (!item || typeof item.id !== "string") return;
+            var option = document.createElement("option");
+            option.value = item.id;
+            /* Catalogue names arrive as "Vendor: Model Name (free)". Both halves are
+               redundant here — drop them so the free/paid tag still fits on a phone. */
+            var label = (item.name || item.id)
+              .replace(/\s*\(free\)\s*$/i, "")
+              .replace(/^[^:]{1,20}:\s*/, "");
+            option.textContent = label + (item.paid ? " — paid" : " — free");
+            if (item.id === saved) {
+              option.selected = true;
+              hasSaved = true;
+            }
+            modelSelect.appendChild(option);
+          });
+
+          if (!modelSelect.options.length) return;
+          if (!hasSaved) modelSelect.selectedIndex = 0;
+
+          modelSelect.hidden = false;
+          if (modelLabel) modelLabel.textContent = "Model";
+        })
+        .catch(function () {
+          /* Picker stays hidden; the server still answers with its own default. */
+        });
+    }
+
+    if (modelSelect) {
+      modelSelect.addEventListener("change", function () {
+        rememberModel(modelSelect.value);
+      });
+    }
 
     function addMessage(role, text, pending) {
       var item = document.createElement("div");
@@ -528,6 +600,7 @@
           "Hello! I can help with branch details, opening hours, services and general product information. How can I help?"
         );
       }
+      loadModels();
       window.setTimeout(function () { input.focus(); }, 50);
     }
 
@@ -561,10 +634,15 @@
       var pending = addMessage("assistant", "Thinking…", true);
       sendBtn.disabled = true;
 
+      var request = { messages: messages.slice(-10) };
+      if (modelSelect && !modelSelect.hidden && modelSelect.value) {
+        request.model = modelSelect.value;
+      }
+
       fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: messages.slice(-10) })
+        body: JSON.stringify(request)
       })
         .then(function (response) {
           return response.json().then(function (payload) {

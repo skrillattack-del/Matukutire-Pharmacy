@@ -8,4 +8,5 @@ services:
       - PORT=8080
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-}
+      - OPENROUTER_PAID_MODEL=${OPENROUTER_PAID_MODEL:-}
     restart: unless-stopped
