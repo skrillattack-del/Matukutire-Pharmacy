@@ -467,10 +467,10 @@
   });
 
   /* ------------------------------------------------------------------------
-     14. AI assistant dock — browser-native OpenRouter chat.
+     14. AI assistant dock — server-side OpenRouter chat.
 
-     The user supplies a throwaway OpenRouter key in the UI. It is stored only
-     in this browser's localStorage and is never sent to this website/server.
+     The OpenRouter API key lives in a Railway environment variable and is
+     handled by chat-handler.php. The browser never sees the key.
      ------------------------------------------------------------------------ */
   (function chatDock() {
     var dock = document.querySelector("[data-chat-dock]");
@@ -480,36 +480,14 @@
     var closeBtn = dock.querySelector("[data-chat-close]");
     var body = dock.querySelector(".chat-dock-body");
     var note = dock.querySelector(".chat-dock-note");
-    var KEY_STORAGE = "matukutire-openrouter-key";
-    var MODEL_STORAGE = "matukutire-openrouter-model";
-    var API_URL = "https://openrouter.ai/api/v1/chat/completions";
+    var API_URL = "chat-handler.php";
     var messages = [];
 
     if (!body) return;
     body.innerHTML =
-      '<section class="chat-setup" data-chat-setup>' +
-        '<div class="chat-setup-icon"><i class="bi bi-key-fill"></i></div>' +
-        '<h3>Connect OpenRouter</h3>' +
-        '<p>Paste a throwaway API key. It stays in this browser and can be cleared anytime.</p>' +
-        '<label for="openrouter-key">OpenRouter API key</label>' +
-        '<div class="chat-key-row">' +
-          '<input id="openrouter-key" data-chat-key type="password" autocomplete="off" placeholder="sk-or-v1-…" />' +
-          '<button data-chat-key-toggle type="button" aria-label="Show API key"><i class="bi bi-eye"></i></button>' +
-        '</div>' +
-        '<label for="openrouter-model">Model</label>' +
-        '<select id="openrouter-model" data-chat-model>' +
-          '<option value="openrouter/free">OpenRouter Free Router</option>' +
-          '<option value="google/gemini-2.5-flash">Gemini 2.5 Flash</option>' +
-          '<option value="anthropic/claude-sonnet-4">Claude Sonnet 4</option>' +
-          '<option value="openai/gpt-4.1-mini">GPT-4.1 mini</option>' +
-        '</select>' +
-        '<button class="btn chat-connect" data-chat-connect type="button">Start assistant</button>' +
-        '<p class="chat-setup-error" data-chat-setup-error role="alert"></p>' +
-      '</section>' +
-      '<section class="chat-conversation" data-chat-conversation hidden>' +
+      '<section class="chat-conversation" data-chat-conversation>' +
         '<div class="chat-toolbar">' +
-          '<span data-chat-model-label></span>' +
-          '<button data-chat-settings type="button"><i class="bi bi-gear"></i> API settings</button>' +
+          '<span data-chat-model-label>Pharmacy assistant</span>' +
         '</div>' +
         '<div class="chat-messages" data-chat-messages aria-live="polite"></div>' +
         '<form class="chat-composer" data-chat-form>' +
@@ -521,40 +499,13 @@
 
     if (note) {
       note.textContent =
-        "General information only — medicine advice must be confirmed with a pharmacist or doctor. Your API key stays in this browser.";
+        "General information only — medicine advice must be confirmed with a pharmacist or doctor.";
     }
 
-    var setup = body.querySelector("[data-chat-setup]");
-    var conversation = body.querySelector("[data-chat-conversation]");
-    var keyInput = body.querySelector("[data-chat-key]");
-    var keyToggle = body.querySelector("[data-chat-key-toggle]");
-    var modelSelect = body.querySelector("[data-chat-model]");
-    var connectBtn = body.querySelector("[data-chat-connect]");
-    var setupError = body.querySelector("[data-chat-setup-error]");
-    var settingsBtn = body.querySelector("[data-chat-settings]");
-    var modelLabel = body.querySelector("[data-chat-model-label]");
     var messageList = body.querySelector("[data-chat-messages]");
     var form = body.querySelector("[data-chat-form]");
     var input = body.querySelector("[data-chat-input]");
     var sendBtn = body.querySelector("[data-chat-send]");
-
-    keyInput.value = localStorage.getItem(KEY_STORAGE) || "";
-    modelSelect.value = localStorage.getItem(MODEL_STORAGE) || "openrouter/free";
-
-    function setSetupVisible(visible) {
-      setup.hidden = !visible;
-      conversation.hidden = visible;
-      if (!visible) {
-        modelLabel.textContent = modelSelect.options[modelSelect.selectedIndex].text;
-        if (!messages.length) {
-          addMessage(
-            "assistant",
-            "Hello! I can help with branch details, opening hours, services and general product information. How can I help?"
-          );
-        }
-        window.setTimeout(function () { input.focus(); }, 50);
-      }
-    }
 
     function addMessage(role, text, pending) {
       var item = document.createElement("div");
@@ -565,35 +516,19 @@
       return item;
     }
 
-    function currentKey() {
-      return keyInput.value.trim();
-    }
-
-    function saveSettings() {
-      var key = currentKey();
-      if (!/^sk-or-/i.test(key)) {
-        setupError.textContent = "Enter a valid OpenRouter key beginning with sk-or-.";
-        keyInput.focus();
-        return false;
-      }
-      setupError.textContent = "";
-      localStorage.setItem(KEY_STORAGE, key);
-      localStorage.setItem(MODEL_STORAGE, modelSelect.value);
-      return true;
-    }
-
-    function connect() {
-      if (saveSettings()) setSetupVisible(false);
-    }
-
     function openDock() {
       dock.classList.add("is-open");
       dock.removeAttribute("aria-hidden");
       toggle.classList.add("is-active");
       toggle.setAttribute("aria-expanded", "true");
       toggle.setAttribute("aria-label", "Close the pharmacy assistant");
-      if (currentKey()) setSetupVisible(false);
-      else window.setTimeout(function () { keyInput.focus(); }, 50);
+      if (!messages.length) {
+        addMessage(
+          "assistant",
+          "Hello! I can help with branch details, opening hours, services and general product information. How can I help?"
+        );
+      }
+      window.setTimeout(function () { input.focus(); }, 50);
     }
 
     function closeDock() {
@@ -615,21 +550,6 @@
 
     if (closeBtn) closeBtn.addEventListener("click", closeDock);
 
-    connectBtn.addEventListener("click", connect);
-    keyInput.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") connect();
-    });
-    keyToggle.addEventListener("click", function () {
-      var showing = keyInput.type === "text";
-      keyInput.type = showing ? "password" : "text";
-      keyToggle.innerHTML = showing ? '<i class="bi bi-eye"></i>' : '<i class="bi bi-eye-slash"></i>';
-      keyToggle.setAttribute("aria-label", showing ? "Show API key" : "Hide API key");
-    });
-    settingsBtn.addEventListener("click", function () {
-      setSetupVisible(true);
-      keyInput.focus();
-    });
-
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var text = input.value.trim();
@@ -643,44 +563,22 @@
 
       fetch(API_URL, {
         method: "POST",
-        headers: {
-          "Authorization": "Bearer " + currentKey(),
-          "Content-Type": "application/json",
-          "HTTP-Referer": window.location.origin,
-          "X-OpenRouter-Title": "Matukutire Pharmacies"
-        },
-        body: JSON.stringify({
-          model: modelSelect.value,
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are the Matukutire Pharmacies website assistant for Lomagundi Pharmacy in Chinhoyi and Forestal Machipisa Pharmacy in Harare, Zimbabwe. Help with branch information, hours, services and general product questions. Never diagnose, prescribe, claim live stock or replace a pharmacist or doctor. For symptoms, interactions, dosage, pregnancy, emergencies or uncertain medicine advice, direct the user to a qualified pharmacist or medical professional. Keep answers concise and friendly."
-            }
-          ].concat(messages.slice(-10)),
-          temperature: 0.3,
-          max_tokens: 500
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: messages.slice(-10) })
       })
         .then(function (response) {
           return response.json().then(function (payload) {
             if (!response.ok) {
-              throw new Error(
-                (payload && payload.error && payload.error.message) ||
-                "OpenRouter returned HTTP " + response.status + "."
-              );
+              throw new Error(payload.message || "Assistant returned HTTP " + response.status + ".");
             }
-            return payload;
+            if (!payload.success || typeof payload.reply !== "string") {
+              throw new Error(payload.message || "The assistant returned an unexpected response.");
+            }
+            return payload.reply;
           });
         })
-        .then(function (payload) {
-          var answer =
-            payload &&
-            payload.choices &&
-            payload.choices[0] &&
-            payload.choices[0].message &&
-            payload.choices[0].message.content;
-          if (!answer) throw new Error("The model returned an empty response.");
+        .then(function (answer) {
+          if (!answer) throw new Error("The assistant returned an empty response.");
           pending.textContent = answer;
           pending.classList.remove("is-pending");
           messages.push({ role: "assistant", content: answer });
